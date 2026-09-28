@@ -8,10 +8,10 @@ use Illuminate\Support\Facades\Storage;
 class Image extends Model
 {
     // Разрешаем массовое заполнение поля path
-    protected $fillable = ['path'];
+    protected $fillable = ['path'];// путь до файла на компі
 
     // Указываем Laravel, что нужно автоматически добавлять поле 'url' в JSON-ответы
-    protected $appends = ['url'];
+    protected $appends = ['url'];// путь до файла в браузері
 
     /**
      * Создаем виртуальное поле 'url'

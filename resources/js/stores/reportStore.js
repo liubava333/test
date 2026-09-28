@@ -4,12 +4,12 @@ import axios from 'axios';
 
 export const useReportStore = defineStore('report', () => {
     // -----------PREVIEW-----------------------
-    const localImages = ref([]); // Для превью до отправки
+    const previewImages = ref([]); // Для превью до отправки
     const serverImages = ref([]); // Для картинок, которые уже на сервере
     const isUploading = ref(false);
     const isDragOver = ref(false); // Управляет подсветкой
 
-// 2. Создаем функцию загрузки картинок с сервера
+    // 2. Создаем функцию загрузки картинок с сервера
     const fetchServerImages = async () => {
         try {
             const response = await axios.get('/api/images');
@@ -25,10 +25,10 @@ export const useReportStore = defineStore('report', () => {
     };
     // Отправка изображений на Laravel-бэкенд (сервер)
     const uploadImages = async () => {
-        if (localImages.value.length === 0) return;
+        if (previewImages.value.length === 0) return;
         isUploading.value = true;
         const formData = new FormData();
-        localImages.value.forEach(item => formData.append('images[]', item.file));
+        previewImages.value.forEach(item => formData.append('images[]', item.file));
         try {
             const response = await axios.post('/api/upload-images', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -36,12 +36,12 @@ export const useReportStore = defineStore('report', () => {
             // Laravel должен вернуть массив объектов с id и url
             // Пример ответа: [{id: 1, url: '/storage/uploads/1.jpg'}, ...]
             serverImages.value.push(...response.data.images.map(img => ({
-                ...img,
+                ...img, // .map - робить новий изменнений масив
                 isEditing: false // флаг для переключения режима редактирования
-            })));
+            }))); // без ...(spread operator) буде масив в масиві(вложенность,яка зламає верстку)
             // Очищаем локальное превью
-            localImages.value.forEach(item => URL.revokeObjectURL(item.preview));
-            localImages.value = [];
+            previewImages.value.forEach(item => URL.revokeObjectURL(item.preview));
+            previewImages.value = [];
         } catch (error) {
             console.error(error);
             alert('Ошибка при сохранении файлов');
@@ -49,18 +49,18 @@ export const useReportStore = defineStore('report', () => {
             isUploading.value = false;
         }
     };
-// Логика обработки файлов (Клик / Дроп)
+    // Логика обработки файлов (Клик / Дроп)
     const processFiles = (filesList) => {
         Array.from(filesList).forEach((file) => {
             if (!file.type.startsWith('image/')) return;
-            const previewUrl = URL.createObjectURL(file);
-            localImages.value.push({ file, preview: previewUrl });
+            const previewUrl = URL.createObjectURL(file); // Blob URL (існує в цій вкладці  до тех пор, пока документ (страница)
+            // blob:http://localhost/e732168e-8b34-4d77-b42d-10f59ae0e8b6
+            // живёт в этой вкладке, либо пока вы вручную не удалите ссылку из памяти с помощью метода URL.revokeObjectURL(previewUrl))
+            previewImages.value.push({ file, preview: previewUrl });
         });
     };
-
     // Обработка обычного выбора через клик и окно проводника
     const handleFileChange = (e) => { processFiles(e.target.files); e.target.value = ''; };
-
     // ОБРАБОТКА ДРОПА (ПЕРЕТАСКИВАНИЯ) МЫШЬЮ
     const handleDrop = (e) => {
         isDragOver.value = false; // гасим подсветку
@@ -69,8 +69,8 @@ export const useReportStore = defineStore('report', () => {
         }
     };
     const removeLocalImage = (index) => {
-        URL.revokeObjectURL(localImages.value[index].preview);
-        localImages.value.splice(index, 1);
+        URL.revokeObjectURL(previewImages.value[index].preview);
+        previewImages.value.splice(index, 1);
     };
     // УДАЛЕНИЕ С СЕРВЕРА
     const deleteFromServer = async (id, index) => {
@@ -85,18 +85,18 @@ export const useReportStore = defineStore('report', () => {
         }
     };
 
-// РЕДАКТИРОВАНИЕ (ЗАМЕНА) КАРТИНКИ НА СЕРВЕРЕ
+    // РЕДАКТИРОВАНИЕ (ЗАМЕНА) КАРТИНКИ НА СЕРВЕРЕ
     const saveEditedImage = async (event, index) => {
         const file = event.target.files[0];
         if (!file || !file.type.startsWith('image/')) return;
 
         const imageId = serverImages.value[index].id;
-        const formData = new FormData();
-        formData.append('image', file);
-        formData.append('_method', 'POST'); // Метод PUT внутри FormData для Laravel
 
+        const formData = Object.entries({ image: file, _method: 'PUT' })
+            .reduce((fd, [k, v]) =>
+                (fd.append(k, v), fd), new FormData());
         try {
-            const response = await axios.post(`/api/images/${imageId}`, formData, {
+            const response = await axios.put(`/api/images/${imageId}`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
@@ -288,7 +288,7 @@ export const useReportStore = defineStore('report', () => {
     });
     return { fileParsingStatus, progress, parsedData, parseReportId, parseData, filters, fileGenerationStatus,
         startGeneration, isLoading, stopPolling, startPolling, parseJsonData, fileExtension,
-        uploadImages, isUploading, removeLocalImage, handleFileChange, handleDrop, localImages, serverImages, isDragOver,
-        saveEditedImage, deleteFromServer, user
+        uploadImages, isUploading, removeLocalImage, handleFileChange, handleDrop, previewImages, serverImages, isDragOver,
+        saveEditedImage, deleteFromServer
     };
 });

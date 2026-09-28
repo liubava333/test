@@ -14,8 +14,8 @@ export default {
 
 <template>
     <div class="flex flex-col gap-4 justify-center items-center w-full p-4">
-<!--        <Test></Test>-->
-        <Preview></Preview>
+        <Test></Test>
+<!--        <Preview></Preview>-->
         <ReportGenerator></ReportGenerator>
         <ParsingFile></ParsingFile>
     </div>

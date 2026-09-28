@@ -5,29 +5,8 @@ export default {
     name: "Preview",
     setup() {
         const reportStore = useReportStore();
-
-        // Обработка выбора файлов
-        const handlePreviewChange = (event) => {
-            const selectedFiles = Array.from(event.target.files);
-
-            selectedFiles.forEach((file) => {
-                // Проверяем, что это действительно изображение
-                if (!file.type.startsWith('image/')) return;
-
-                // Создаем локальную ссылку для тега <img> (мгновенное превью)
-                const previewUrl = URL.createObjectURL(file);
-
-                reportStore.localImages.push({
-                    file: file,          // Сам файл для отправки
-                    preview: previewUrl  // Ссылка для отображения в теге src
-                });
-            });
-
-            // Сбрасываем значение инпута, чтобы можно было выбрать те же файлы повторно
-            event.target.value = '';
-        };
         return  {
-            reportStore, handlePreviewChange
+            reportStore,
         }
     }
 }
@@ -58,10 +37,10 @@ export default {
         </div>
 
         <!-- БЛОК 1: ВРЕМЕННОЕ ПРЕВЬЮ (До отправки) -->
-        <div v-if="reportStore.localImages.length > 0" class="space-y-2">
+        <div v-if="reportStore.previewImages.length > 0" class="space-y-2">
             <h3 class="text-sm font-semibold text-gray-600">Новые файлы для отправки:</h3>
             <div class="grid grid-cols-3 gap-4">
-                <div v-for="(image, index) in reportStore.localImages" :key="index" class="relative group border rounded-lg overflow-hidden h-24 bg-gray-100">
+                <div v-for="(image, index) in reportStore.previewImages" :key="index" class="relative group border rounded-lg overflow-hidden h-24 bg-gray-100">
                     <img :src="image.preview" class="w-full h-full object-cover" alt="Превью" />
                     <button
                         @click="reportStore.removeLocalImage(index)"
@@ -75,7 +54,7 @@ export default {
         <!-- КНОПКА ОТПРАВКИ -->
         <button
             @click="reportStore.uploadImages"
-            :disabled="reportStore.localImages.length === 0 || reportStore.isUploading"
+            :disabled="reportStore.previewImages.length === 0 || reportStore.isUploading"
             class="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
         >
             {{ reportStore.isUploading ? 'Загрузка...' : 'Загрузить на сервер' }}
