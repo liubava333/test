@@ -32,17 +32,6 @@ class ReportController extends Controller
         return response()->json($report); // Возвращаем созданный репорт с ID
     }
 
-    // Проверка статуса (Polling фронтендом по ID записи)
-    public function checkStatus(int $id): JsonResponse
-    {
-        $report = Report::findOrFail($id);
-
-        return response()->json([
-            'status' => $report->status,
-            'type' => 'export'
-        ]);
-    }
-
     // Скачивание готового файла после завершения
     public function download(int $id): BinaryFileResponse
     {

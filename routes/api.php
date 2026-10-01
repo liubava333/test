@@ -12,10 +12,10 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-Route::post('/parseData', [ReportParseController::class, 'parseData']);
 Route::post('/reports/generate', [ReportController::class, 'generate']);
-Route::get('/reports/{id}/status', [ReportController::class, 'checkStatus']);
 Route::get('/reports/{id}/download', [ReportController::class, 'download']);
+
+Route::post('/parseData', [ReportParseController::class, 'parseData']);
 Route::get('/reports-parse/{id}', [ReportParseController::class, 'checkParseStatus']);
 
 Route::get('/images', [ImageController::class, 'index']);

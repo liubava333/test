@@ -15,7 +15,7 @@ export default {
 <template>
     <div class="font-instrument p-6 w-full max-w-4xl bg-white rounded-xl shadow-md  flex items-center flex-col justify-between">
         <h2 class="text-xl font-bold text-center w-full mb-4">Генератор отчетов</h2>
-        <form @submit.prevent="reportStore.startGeneration" class="form flex-1 flex flex-col justify-center gap-3">
+        <form class="form flex-1 flex flex-col justify-center gap-3">
             <div class="form-group">
                 <label>Дата начала:</label>
                 <input type="date" v-model="reportStore.filters.start_date" required />
@@ -58,6 +58,14 @@ export default {
                     <p v-if="reportStore.fileGenerationStatus === 'error'" class="text-red-600">
                         ❌ Произошла ошибка.
                     </p>
+                </div>
+                <!-- Красивая линия прогресса на Tailwind CSS -->
+                <span>{{ reportStore.reportProgress }}%</span>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div
+                        class="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                        :style="{ width: reportStore.reportProgress + '%' }"
+                    ></div>
                 </div>
 
             </div>

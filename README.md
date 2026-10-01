@@ -14,4 +14,7 @@
 -Заполнение базы данных (Seeding)
 -sail artisan db:seed
 - обовязково створити sim-link: sail artisan storage:link - для картинок
-
+- laravel echo pusher install
+- Запуск WebSocket-сервера Reverb
+- sail artisan reverb:start
+- 

@@ -1,6 +1,7 @@
 <?php
 namespace App\Jobs;
 
+use App\Events\ReportStatusUpdated;
 use App\Models\Report;
 use App\Models\Order; // Ваша модель с данными
 use Illuminate\Bus\Queueable;
@@ -33,7 +34,7 @@ class CreateReportJob implements ShouldQueue
             // 1. Формируем запрос
             $query = Order::query()
                 ->whereBetween('created_at', [$this->filters['start_date'] . ' 00:00:00', $this->filters['end_date'] . ' 23:59:59']);
-
+            $totalOrders = $query->count();
             if (!empty($this->filters['status'])) {
                 $query->where('status', $this->filters['status']);
             }
@@ -42,6 +43,7 @@ class CreateReportJob implements ShouldQueue
             if (!$query->exists()) {
                 Report::where('id', $this->report->id)->update([
                     'status' => 'completed',
+                    'progress' => 100,
                     // Записываем сообщение во Vue, чтобы фронтенд знал, что файл пустой
                     'parsed_data' => ['message' => 'Нет данных за указанный период', 'file_path' => null]
                 ]);
@@ -50,16 +52,18 @@ class CreateReportJob implements ShouldQueue
 
             // 2. Открываем временный файл для записи
             $fileName = 'reports/export_' . time() . '_' . $this->report->id . '.csv';
-            $handle = fopen('php://temp', 'r+');
+            $handle = fopen('php://temp', 'r+');//создает временный файл прямо в оперативной памяти сервера
+            // и возвращает указатель (ссылку) на него в переменную $handle,указатель ставится вначало файла
+            // php://temp - виртуальный поток (stream) в PHP
 
-            // BOM для Excel (кириллица)
+            // BOM(маркер последовательности байтов) для Excel (кириллица)
             fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
             fputcsv($handle, ['ID Заказа', 'Клиент', 'Сумма', 'Статус', 'Дата']);
 
             $processedRows = 0;
 
             // Читаем чанками, чтобы не перегружать ОЗУ
-            $query->chunk(100, function ($orders) use ($handle, &$processedRows) {
+            $query->chunk(100, function ($orders) use ($handle, &$processedRows, $totalOrders) {
                 foreach ($orders as $order) {
                     fputcsv($handle, [
                         $order->id,
@@ -70,24 +74,30 @@ class CreateReportJob implements ShouldQueue
                     ]);
                     $processedRows++;
                 }
+                // Вычисляем процент выполнения
+                $currentProgress = min(100, round(($processedRows / $totalOrders) * 100));
+                event(new ReportStatusUpdated($this->report->id, 'pending', $currentProgress ));
             });
 
             // Сохраняем файл в Storage
-            rewind($handle);
+            rewind($handle); // перемотать = возвращает указатель чтения/записи в самое начало файла.
             Storage::put($fileName, stream_get_contents($handle));
             fclose($handle);
 
             // 3. ФИНАЛ: Переводим статус в completed и сохраняем путь к файлу в parsed_data
             Report::where('id', $this->report->id)->update([
                 'status' => 'completed',
-                'parsed_data' => json_encode(['file_path' => $fileName]) // сохраняем путь для скачивания
+                'progress' => 100,
+                'parsed_data' => ['file_path' => $fileName] // сохраняем путь для скачивания
             ]);
-
+            // В самом конце, когда файл готов:
+            event(new ReportStatusUpdated($this->report->id, 'completed', 100));
         } catch (\Exception $e) {
+            event(new ReportStatusUpdated($this->report->id, 'error'));
             // В случае ошибки пишем статус error
             Report::where('id', $this->report->id)->update([
                 'status' => 'error',
-                'parsed_data' => json_encode(['error' => $e->getMessage()])
+                'parsed_data' => ['error' => $e->getMessage()]
             ]);
         }
     }

@@ -113,6 +113,7 @@ export const useReportStore = defineStore('report', () => {
     const fileGenerationStatus = ref('idle'); // idle, processing, completed, error
     const fileParsingStatus = ref('idle');
     const isLoading = ref(false);
+    const reportProgress = ref(0);
     const errorMessage = ref('');
     // Инициализация фильтров (по умолчанию текущий месяц)
     const today = new Date().toISOString().split('T')[0];
@@ -127,44 +128,46 @@ export const useReportStore = defineStore('report', () => {
         isLoading.value = true;
         errorMessage.value = '';
         fileGenerationStatus.value = 'pending';
+        reportProgress.value = 0;
 
         try {
             // 1. Создаем отчет и получаем его ID
             const response = await axios.post('/api/reports/generate', filters);
             const reportId = response.data.id;
-
+            reportProgress.value = response.data.progress;
             // 2. Запускаем опрос статуса по ID
-            trackProgress(reportId);
+            await trackProgress(reportId);
+
         } catch (error) {
             isLoading.value = false;
             errorMessage.value = 'Не удалось запустить генерацию.';
         }
     };
 
-    const trackProgress = (generateReportId) => {
-        const interval = setInterval(async () => {
-            try {
-                const res = await axios.get(`/api/reports/${generateReportId}/status`);
-                fileGenerationStatus.value = res.data.status;
+    const trackProgress = async(generateReportId) => {
+        // Подключаемся к приватному каналу Reverb
+        window.Echo.channel(`reports.${generateReportId}`)
+            .listen('.report.status', (data) => {
+                reportProgress.value = data.progress;
+                // Как только сервер пришлет событие — этот код мгновенно сработает!
+                fileGenerationStatus.value = data.status;
 
-                if (res.data.status === 'completed') {
-                    clearInterval(interval);
+                if (data.status === 'completed' && data.progress === 100) {
                     isLoading.value = false;
-                    // 3. Скачиваем готовый файл в браузер
+
+                    // Отписываемся от канала, так как задача выполнена
+                    window.Echo.leave(`reports.${generateReportId}`);
+
+                    // Скачиваем готовый файл
                     window.location.href = `/api/reports/${generateReportId}/download`;
                 }
 
-                if (res.data.status === 'error') {
-                    clearInterval(interval);
+                if (data.status === 'error') {
                     isLoading.value = false;
+                    window.Echo.leave(`reports.${generateReportId}`);
                     errorMessage.value = 'Произошла ошибка при сборке отчета на сервере.';
                 }
-            } catch (error) {
-                clearInterval(interval);
-                isLoading.value = false;
-                errorMessage.value = 'Ошибка связи с сервером.';
-            }
-        }, 1500); // Опрос каждые 1.5 секунды
+            });
     };
 //---------------- FILE PARSE --------------------
 
@@ -289,6 +292,6 @@ export const useReportStore = defineStore('report', () => {
     return { fileParsingStatus, progress, parsedData, parseReportId, parseData, filters, fileGenerationStatus,
         startGeneration, isLoading, stopPolling, startPolling, parseJsonData, fileExtension,
         uploadImages, isUploading, removeLocalImage, handleFileChange, handleDrop, previewImages, serverImages, isDragOver,
-        saveEditedImage, deleteFromServer
+        saveEditedImage, deleteFromServer, reportProgress
     };
 });
